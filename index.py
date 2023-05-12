@@ -6,6 +6,7 @@ import re
 from nltk.stem import PorterStemmer
 from collections import defaultdict
 
+file_name = "ANALYST"
 ps = PorterStemmer()
 BATCH_SIZE = 1024 * 1024 * 1024  # 1 GB
 
@@ -79,14 +80,14 @@ def get_index_stats(index):
     with open('inverted_index.pickle', 'rb') as file:
         index = pickle.load(file)
     num_docs = 0
-    for root, dirs, files in os.walk("DEV/"):
+    for root, dirs, files in os.walk(file_name + "/"):
         num_docs += len(files)
     num_tokens = len(index.keys())
     index_size = get_size('inverted_index.pickle')
     return num_docs, num_tokens, index_size
 
 
-index = build_index("DEV/")
+index = build_index(file_name + "/")
 
 num_docs, num_tokens, index_size = get_index_stats(index)
 

@@ -5,8 +5,9 @@ import os
 import re
 from nltk.stem import PorterStemmer
 from collections import defaultdict
+import time
 
-file_name = "ANALYST"
+file_name = "DEV"
 ps = PorterStemmer()
 BATCH_SIZE = 1024 * 1024 * 1024  # 1 GB
 
@@ -87,13 +88,18 @@ def get_index_stats(index):
     return num_docs, num_tokens, index_size
 
 
+start_time = time.time()
+
 index = build_index(file_name + "/")
 
 num_docs, num_tokens, index_size = get_index_stats(index)
 
+
 print("Number of documents:", num_docs)
 print("Number of unique tokens:", num_tokens)
 print("Total size of index (Bytes):", index_size)
+
+print(f"total processing time: {time.time() - start_time} sec")
 
 
 

@@ -1,107 +1,147 @@
-from pathlib import Path
-import sys
-import pickle
 import os
+from pathlib import Path
+import json
+import io
+import pickle
+from bs4 import BeautifulSoup
 import re
-from nltk.stem import PorterStemmer
-from collections import defaultdict
+from collections import Counter, defaultdict
+from nltk import stem
+from urllib.parse import urldefrag
+import sys
+from math import log10
 import time
 
-file_name = "DEV"
-ps = PorterStemmer()
-BATCH_SIZE = 1024 * 1024 * 1024  # 1 GB
+STEMMER = stem.PorterStemmer()
+PATH = "ANALYST/"
+partialIndexPath = "partial_index_"
+fullIndexPath = "index.jsonl"
+importantTags = ["h1", "h2", "h3", "strong", "b"]
+batch_size = 1024 * 1024 * 1024
 
 
-def tokenize(text):
-    tokens = []
-    for word in re.findall(r'\w+', text):
-        tokens.append(ps.stem(word.lower()))
-    return tokens
+class Index:
+    def __init__(self, path) -> None:
+        self.filepath = path
+        self.idToUrl = {}
+        self.urlToId = {}
+        self.inverted_index = defaultdict(list)
+        self.batchCounter = 0
+        self.numberOfFilesProcessed = 0
+        self.document_number = 0
+        self.numberOfTokensProcessed = 0
 
 
-def get_file_contents(file_path):
-    with open(file_path, 'r', encoding='ISO-8859-1') as file:
-        return file.read()
+    @staticmethod
+    def generate_line(filename, chunk_size=1024 * 1024):
+        """This function reads file in chunks (1GB). It returns a single key and posting pair."""
+        # Used BufferReader because this allows us to read the data in chunks without reading line by line and could be efficient for very large files
+        with open(filename, "rb") as file:
+            buffer = io.BufferedReader(file, chunk_size)
+            while True:
+                chunk = buffer.readline()
+                if not chunk:
+                    break
+                line = chunk.decode().strip()
+                yield json.loads(line)
+
+    def write_to_pickle(self):
+        """Writing the data to pickle file."""
+        # We have used pickle here because writing to pickle file would be much more efficient than writing to json file.
+        with open("IDUrlMap.pickle", "wb") as f:
+            buffer = io.BufferedWriter(f)
+            pickle.dump(self.idToUrl, buffer)
+            buffer.flush()
+
+    def tfidf_score(self):
+        pass
+
+    def build_index(self):
+        path = Path(self.filepath)
+        for directory in path.iterdir():
+            #print(directory)
+            if not directory.is_dir():
+                continue
+            for file in directory.iterdir():
+                #print(file)
+                if not file.is_file():
+                    continue
+
+                self.process_file(file)
+                self.document_number += 1
+
+                if sys.getsizeof(self.inverted_index) >= batch_size:
+                    self.partial_index()
+
+        if self.inverted_index:
+            self.partial_index()
+
+    def process_file(self, file):
+        try:
+            with open(file) as jsonFile:
+                file_dict = json.load(jsonFile)
+                url = urldefrag(file_dict["url"]).url
+
+                self.urlToId[url] = self.document_number
+                self.idToUrl[self.document_number] = url
+
+                raw_content = file_dict["content"]
+                soup = BeautifulSoup(raw_content, "html.parser")
+                important_words = self.extract_important_words(soup)
+                token_frequency = self.tokenize_content(soup)
+
+                for token, frequency in token_frequency.items():
+                    if token not in self.inverted_index:
+                        self.inverted_index[token] = []
+
+                    if token in important_words:
+                        self.inverted_index[token].append((self.document_number, frequency * 100))
+                    else:
+                        self.inverted_index[token].append((self.document_number, frequency))
+                self.numberOfFilesProcessed += 1
+        except Exception as e:
+            print(f"Error processing file {file}: {e}")
+            return None
+
+        return file
+
+    def extract_important_words(self, content):
+        important_words = set()
+        for tags in content.find_all(importantTags):
+            for words in re.sub(r"[^a-zA-Z0-9\s]", "", tags.text.lower()).split():
+                important_words.add(STEMMER.stem(words))
+        return important_words
+
+    def tokenize_content(self, content):
+        content = content.find_all()
+        frequency = Counter()
+        for line in content:
+            if not line.text:
+                continue
+            tokens = [STEMMER.stem(word) for word in re.sub(r"[^a-zA-Z0-9\s]", "", line.text.lower()).split()]
+            frequency.update(tokens)
+        return frequency
+
+    def partial_index(self):
+        pass
+
+    def merge_index(self):
+        pass
+
+    def printStats(self):
+        #totalSize = os.stat("index.jsonl").st_size
+        print("Number of files processed:", self.numberOfFilesProcessed)
+        print("Number of unique tokens:", self.numberOfTokensProcessed)
+        print("Total disk size (bytes):")
 
 
-def index_document(file_path, index):
-    try:
-        text = get_file_contents(file_path)
-        tokens = tokenize(text)
-        for i, token in enumerate(tokens):
-            posting = (file_path.name, i + 1)  # document name/id and position
-            index[token].append(posting)
-        if sys.getsizeof(index) >= BATCH_SIZE:
-            PartialIndex(index)
-        return index
-    except:
-        print(f"Skipping file: {file_path}")
-        return index
-
-
-def PartialIndex(index):
-    index_file = f"partial_index_{PartialIndex.counter}.pickle"
-    with open(index_file, 'wb') as file:
-        pickle.dump(index, file)
-    PartialIndex.index_files.append(index_file)
-    PartialIndex.counter += 1
-    return defaultdict(list)
-
-
-PartialIndex.index_files = []
-PartialIndex.counter = 0
-
-
-def merge_indexes(index_files):
-    merged_index = defaultdict(list)
-    for index_file in index_files:
-        with open(index_file, 'rb') as file:
-            index = pickle.load(file)
-        for key, postings in index.items():
-            merged_index[key].extend(postings)
-        os.remove(index_file)
-    return merged_index
-
-
-def build_index(directory):
-    index = defaultdict(list)
-    for root, dirs, files in os.walk(directory):
-        for file_name in files:
-            file_path = Path(root) / file_name
-            index = index_document(file_path, index)
-    if index:
-        PartialIndex(index)
-    merged_index = merge_indexes(PartialIndex.index_files)
-    with open('inverted_index.pickle', 'wb') as file:
-        pickle.dump(merged_index, file)
-    return merged_index
-
-
-def get_size(file_path):
-    return os.stat(file_path).st_size / 1024  # convert to KB
-
-
-def get_index_stats(index):
-    with open('inverted_index.pickle', 'rb') as file:
-        index = pickle.load(file)
-    num_docs = 0
-    for root, dirs, files in os.walk(file_name + "/"):
-        num_docs += len(files)
-    num_tokens = len(index.keys())
-    index_size = get_size('inverted_index.pickle')
-    return num_docs, num_tokens, index_size
-
-
-start_time = time.time()
-
-index = build_index(file_name + "/")
-
-num_docs, num_tokens, index_size = get_index_stats(index)
-
-
-print("Number of documents:", num_docs)
-print("Number of unique tokens:", num_tokens)
-print("Total size of index (Bytes):", index_size)
-print(f"total processing time: {time.time() - start_time} sec")
-
+if __name__ == "__main__":
+    startTime = time.strftime("%H:%M:%S")
+    print(startTime)
+    index = Index(PATH)
+    index.build_index()
+    index.write_to_pickle()
+    index.printStats()
+    endTime = time.strftime("%H:%M:%S")
+    print(endTime)
 

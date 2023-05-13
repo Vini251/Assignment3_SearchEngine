@@ -7,6 +7,7 @@ from nltk.stem import PorterStemmer
 from collections import defaultdict
 import time
 
+file_name = "DEV"
 ps = PorterStemmer()
 BATCH_SIZE = 1024 * 1024 * 1024  # 1 GB
 
@@ -84,20 +85,23 @@ def get_index_stats(index):
     with open('inverted_index.pickle', 'rb') as file:
         index = pickle.load(file)
     num_docs = 0
-    for root, dirs, files in os.walk("DEV/"):
+    for root, dirs, files in os.walk(file_name + "/"):
         num_docs += len(files)
     num_tokens = len(index.keys())
     index_size = get_size('inverted_index.pickle')
     return num_docs, num_tokens, index_size
 
-startTime = time.time()
-print(startTime)
-index = build_index("DEV/")
+
+start_time = time.time()
+
+index = build_index(file_name + "/")
 
 num_docs, num_tokens, index_size = get_index_stats(index)
 
+
 print("Number of documents:", num_docs)
 print("Number of unique tokens:", num_tokens)
-print("Total size of index (KiloBytes):", index_size)
-endTime = time.time()
-print(endTime-startTime)
+print("Total size of index (Bytes):", index_size)
+print(f"total processing time: {time.time() - start_time} sec")
+
+

@@ -7,7 +7,7 @@ from nltk.stem import PorterStemmer
 from collections import defaultdict
 import time
 
-file_name = "DEV"
+file_name = "ANALYST"
 ps = PorterStemmer()
 BATCH_SIZE = 1024 * 1024 * 1024  # 1 GB
 
@@ -32,24 +32,24 @@ def index_document(file_path, index):
             posting = (file_path.name, i + 1)  # document name/id and position
             index[token].append(posting)
         if sys.getsizeof(index) >= BATCH_SIZE:
-            PartialIndex(index)
+            writePartialIndexToFile(index)
         return index
     except:
         print(f"Skipping file: {file_path}")
         return index
 
 
-def PartialIndex(index):
-    index_file = f"partial_index_{PartialIndex.counter}.pickle"
-    with open(index_file, 'wb') as file:
+def writePartialIndexToFile(index: int):
+    index_file = f"partial_index_{writePartialIndexToFile.counter}.pickle"
+    with open(index_file, 'w') as file:
         pickle.dump(index, file)
-    PartialIndex.index_files.append(index_file)
-    PartialIndex.counter += 1
+    writePartialIndexToFile.index_files.append(index_file)
+    writePartialIndexToFile.counter += 1
     return defaultdict(list)
 
 
-PartialIndex.index_files = []
-PartialIndex.counter = 0
+writePartialIndexToFile.index_files = []
+writePartialIndexToFile.counter = 0
 
 
 def merge_indexes(index_files):
@@ -70,8 +70,8 @@ def build_index(directory):
             file_path = Path(root) / file_name
             index = index_document(file_path, index)
     if index:
-        PartialIndex(index)
-    merged_index = merge_indexes(PartialIndex.index_files)
+        writePartialIndexToFile(index)
+    merged_index = merge_indexes(writePartialIndexToFile.index_files)
     with open('inverted_index.pickle', 'wb') as file:
         pickle.dump(merged_index, file)
     return merged_index

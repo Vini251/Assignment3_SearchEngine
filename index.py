@@ -5,6 +5,7 @@ import os
 import re
 from nltk.stem import PorterStemmer
 from collections import defaultdict
+import time
 
 ps = PorterStemmer()
 BATCH_SIZE = 1024 * 1024 * 1024  # 1 GB
@@ -23,14 +24,18 @@ def get_file_contents(file_path):
 
 
 def index_document(file_path, index):
-    text = get_file_contents(file_path)
-    tokens = tokenize(text)
-    for i, token in enumerate(tokens):
-        posting = (file_path.name, i + 1)  # document name/id and position
-        index[token].append(posting)
-    if sys.getsizeof(index) >= BATCH_SIZE:
-        PartialIndex(index)
-    return index
+    try:
+        text = get_file_contents(file_path)
+        tokens = tokenize(text)
+        for i, token in enumerate(tokens):
+            posting = (file_path.name, i + 1)  # document name/id and position
+            index[token].append(posting)
+        if sys.getsizeof(index) >= BATCH_SIZE:
+            PartialIndex(index)
+        return index
+    except:
+        print(f"Skipping file: {file_path}")
+        return index
 
 
 def PartialIndex(index):
@@ -85,14 +90,14 @@ def get_index_stats(index):
     index_size = get_size('inverted_index.pickle')
     return num_docs, num_tokens, index_size
 
-
+startTime = time.time()
+print(startTime)
 index = build_index("DEV/")
 
 num_docs, num_tokens, index_size = get_index_stats(index)
 
 print("Number of documents:", num_docs)
 print("Number of unique tokens:", num_tokens)
-print("Total size of index (Bytes):", index_size)
-
-
-
+print("Total size of index (KiloBytes):", index_size)
+endTime = time.time()
+print(endTime-startTime)

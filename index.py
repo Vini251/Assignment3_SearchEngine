@@ -1,14 +1,21 @@
-from pathlib import Path
-import sys
-import pickle
 import os
+from pathlib import Path
+import json
+import io
+import pickle
+from bs4 import BeautifulSoup
 import re
-from nltk.stem import PorterStemmer
-from collections import defaultdict
+from collections import Counter, defaultdict
+from nltk import stem
+from urllib.parse import urldefrag
+import sys
+from math import log10
 import time
 
 file_name = "ANALYST"
 ps = PorterStemmer()
+PARTIAL_INDEX_FILE = None
+INDEX_FILE_INDEX = 0
 BATCH_SIZE = 1024 * 1024 * 1024  # 1 GB
 
 
@@ -40,13 +47,17 @@ def index_document(file_path, index):
 
 
 def writePartialIndexToFile(index: int):
-    index_file = f"partial_index_{writePartialIndexToFile.counter}.pickle"
-    with open(index_file, 'w') as file:
-        pickle.dump(index, file)
-    writePartialIndexToFile.index_files.append(index_file)
-    writePartialIndexToFile.counter += 1
+    global PARTIAL_INDEX_FILE, INDEX_FILE_INDEX
+    if PARTIAL_INDEX_FILE is None:
+        PARTIAL_INDEX_FILE = open(f"partial_index_{INDEX_FILE_INDEX}.pickle", 'wb')
+    pickle.dump(index, PARTIAL_INDEX_FILE)
+    if INDEX_FILE_INDEX % 1000 == 0:
+        PARTIAL_INDEX_FILE.flush()
+    INDEX_FILE_INDEX += 1
+    if sys.getsizeof(PARTIAL_INDEX_FILE) >= BATCH_SIZE:
+        PARTIAL_INDEX_FILE.close()
+        PARTIAL_INDEX_FILE = None
     return defaultdict(list)
-
 
 writePartialIndexToFile.index_files = []
 writePartialIndexToFile.counter = 0

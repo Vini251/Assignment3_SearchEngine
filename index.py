@@ -53,8 +53,12 @@ class Index:
             pickle.dump(self.idToUrl, buffer)
             buffer.flush()
 
-    def tfidf_score(self):
-        pass
+    def tfidf_score(self, postingsList: list):
+    frequency_tfidf = list()
+    for post in postingsList:
+        tfidf = round((1 + log10(post[1])) * (log10(self.filesProcessed / len(postingsList))), 2)
+        frequency_tfidf.append((post[0], tfidf))
+    return frequency_tfidf
 
     def build_index(self):
         path = Path(self.filepath)

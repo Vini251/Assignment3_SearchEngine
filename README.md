@@ -46,6 +46,9 @@ members on this project, but you are not required to do so.
 # **Milestone 2: Search  (DUE: 5/19/2023)**      
 - Your program should prompt the user for a query. **This doesn’t need to be a Web interface, it can be a console prompt.**     
 - At the time of the query, your program will stem the query terms, look up your index, perform some calculations (see ranking below) and give out the ranked list of pages that are relevant for the query, with the most relevant on top.      
+	- Ranking: at the very least, your ranking formula should include tf-idf,
+and consider the important words, but you are free to add additional
+components to this formula if you think they improve the retrieval
 - Pages should be identified at least by their URLs (but you can use more informative representations).     
 - The response to search queries should be ≤ 300ms. Ideally it would be . 100ms, but you won’t be penalized if it’s higher (as long as it’s kept ≤ 300ms).      
 - Your search component must not load the entire inverted index in main memory. Instead, it must read the postings from the index(es) files on disk. The TAs will verify that this is happening. 

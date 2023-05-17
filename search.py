@@ -1,7 +1,7 @@
 import json
 from nltk import stem
 import re
-import tkinter
+import tkinter as tk
 import time
 
 STEMMER = stem.PorterStemmer()
@@ -52,15 +52,40 @@ def get_similar_docs(query):
     return similar_doc_urls
 
 
-def main():
-    query = input("Enter your query: ")
-    while query != "":
+def search():
+    query = entry.get()
+    if query:
         t1 = time.time()
-        print(get_similar_docs(query))
+        similar_doc_list = get_similar_docs(query)
+        result_text.delete(1.0, tk.END)
+        for i in range(min(5, len(similar_doc_list))):
+            result_text.insert(tk.END, f"{similar_doc_list[i]}\n\n")
         t2 = time.time()
-        print(str(t2-t1) + " seconds")
+        time_label.config(text=f"{t2 - t1:.2f} seconds")
+    else:
+        result_text.delete(1.0, tk.END)
 
-        query = input("Enter your query: ")
+root = tk.Tk()
+root.title("Search Engine")
 
-main()
+frame = tk.Frame(root)
+frame.pack(pady=10)
+
+label = tk.Label(frame, text="Enter your query:")
+label.pack(side=tk.LEFT)
+
+entry = tk.Entry(frame, width=40)
+entry.pack(side=tk.LEFT)
+
+search_button = tk.Button(frame, text="Search", command=search)
+search_button.pack(side=tk.LEFT, padx=10)
+
+result_text = tk.Text(root, height=30, width=100)
+result_text.pack(pady=10, padx=10)
+
+time_label = tk.Label(root, text="")
+time_label.pack()
+
+root.mainloop()
+
 

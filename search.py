@@ -3,8 +3,17 @@ from nltk import stem
 import re
 import tkinter as tk
 import time
+import math
 
 STEMMER = stem.PorterStemmer()
+
+def calculate_cosine_similarity(query_vector, document_vector):
+    dot_product = sum(query_vector[token] * document_vector.get(token, 0) for token in query_vector)
+    query_norm = math.sqrt(sum(value * value for value in query_vector.values()))
+    document_norm = math.sqrt(sum(value * value for value in document_vector.values()))
+    similarity = dot_product / (query_norm * document_norm) if query_norm * document_norm != 0 else 0
+    return similarity
+
 
 def get_similar_docs(query):
     # Load the index file
@@ -26,6 +35,12 @@ def get_similar_docs(query):
         # Parse the JSON object
         data = json.loads(line)
 
+        # Create a dictionary to store the document vector
+        doc_vector = {token: tfidf for token, tfidf in data.items() if token in query_tokens}
+
+        # Calculate the cosine similarity between the query vector and the document vector
+        similarity = calculate_cosine_similarity(query_vector, doc_vector)
+        
         # Iterate over each token and its corresponding document numbers
         for token, doc_scores in data.items():
             if token in query_tokens:

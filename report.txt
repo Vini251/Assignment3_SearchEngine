@@ -1,0 +1,11 @@
+ANALYST:
+Number of files processed: 1212
+Number of unique tokens: 15506
+Total disk size (bytes): 6482524
+
+DEV:
+17:24:54
+Number of files processed: 55393
+Number of unique tokens: 463462
+Total disk size (bytes): 147578791
+18:28:15

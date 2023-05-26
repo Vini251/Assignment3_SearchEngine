@@ -13,7 +13,7 @@ import time
 STEMMER = stem.PorterStemmer()
 PATH = "DEV/"
 fullIndexPath = "index.jsonl"
-importantTags = ["h1", "h2", "h3", "h4", "strong", "b"]
+importantTags = ["h1", "h2", "h3", "strong", "b"]
 batch_size = 3000000
 
 
@@ -28,6 +28,12 @@ class Index:
         self.numberOfTokensProcessed = 0
         self.partialIndexFiles = []
         self.partial_file_index = 0
+        self.important_words = set()
+
+    def write_important_words(self):
+        with open("important_words.txt", 'w') as file:
+            for word in self.important_words:
+                file.write(word + '\n')
 
     def generate_line(self, filename):
         """This function reads file. It returns a single key and posting pair."""
@@ -72,10 +78,10 @@ class Index:
                     raw_content = file_dict["content"]
                     soup = BeautifulSoup(raw_content, features = "html.parser")
                     
-                    important_words = set()
+                
                     for tags in soup.find_all(importantTags):
                         for words in re.sub(r"[^a-zA-Z0-9\s]", "", tags.text.lower()).split():
-                            important_words.add(STEMMER.stem(words))
+                            self.important_words.add(STEMMER.stem(words))
                     
                     soup = soup.find_all()
                     frequency = Counter()
@@ -89,7 +95,7 @@ class Index:
                         if token not in self.inverted_index:
                             self.inverted_index[token] = []
 
-                        if token in important_words:
+                        if token in self.important_words:
                             self.inverted_index[token].append((self.document_number, frequency * 100))
                         else:
                             self.inverted_index[token].append((self.document_number, frequency))
@@ -121,7 +127,6 @@ class Index:
             file_generators = [self.generate_line(filename) for filename in self.partialIndexFiles]  # generator obj for each partial
             next_words = []  # stores most recent word yielded from each generator
             toBeRemoved = set()  # stores empty generators queued for removal
-            index_list = []
 
             for i, gen in enumerate(file_generators):
                 currGensNext = list(next(gen).items())
@@ -144,7 +149,10 @@ class Index:
                 postings.sort(key=lambda x: x[0])  # sort postings by docid
                 postings = self.tfidf_score(postings)  # change raw frequency to tf-idf
                 keyValAsJson = {next_words[i-1][0]: postings}  # write k,v pair into final index
-                index_list.append(keyValAsJson)
+
+                json.dump(keyValAsJson, final)  # write the list of JSON objects to the file
+                final.write("\n")  # add a newline character to the end of the file
+
                 next_words = next_words[len(getNextVals):]  # remove written word
 
                 for i, gen in enumerate(getNextVals):
@@ -155,9 +163,6 @@ class Index:
                         toBeRemoved.add(gen)
                 file_generators = [gen for gen in file_generators if gen not in toBeRemoved]
                 toBeRemoved = set()
-
-            json.dump(index_list, final)  # write the list of JSON objects to the file
-            final.write("\n")  # add a newline character to the end of the file
 
         for file in self.partialIndexFiles:  # remove partial indices
             Path(file).unlink()
@@ -179,6 +184,7 @@ if __name__ == "__main__":
     index.build_index()
     index.write_to_json()
     index.merge_files()
+    index.write_important_words()
     index.print_stats()
     endTime = time.strftime("%H:%M:%S")
     print(endTime)

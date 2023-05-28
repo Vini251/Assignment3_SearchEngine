@@ -67,7 +67,7 @@ mechanisms to help refine the search results.
 
 # **Milestone 3: Final Optimizationa and Demonstration  (DUE: 6/2/2023)** 
 - Optimize the search engine.
-- Right now it is taking around 0.2 - 1.5 seconds depending on queries.
+
 
 
 

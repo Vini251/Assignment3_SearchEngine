@@ -12,7 +12,7 @@ from collections import defaultdict
 
 STEMMER = stem.PorterStemmer()
 
-INDEX_FILE = 'index.csv'
+INDEX_FILE = 'index/index.csv'
 ID_TO_URL_FILE = 'idToUrl.csv'
 CACHE_SIZE_LIMIT = 1000
 # Increase the field size limit
@@ -24,28 +24,44 @@ cache = defaultdict(list)
 
 
 def retrieve_index(word):
-    # Check if the token is present in the cache
     if word in cache:
         return word, cache[word]
 
-    # Token not in the cache, retrieve from disk
-    with open(INDEX_FILE, 'r') as file:
-        reader = csv.reader(file)
-        next(reader)  # Skip the header row
-        for row in reader:
-            token = row[0]
-            if token == word:
-                postings = [tuple(posting.split(':')) for posting in row[1].split(',')]
+    if any(char.isdigit() for char in word):
+        # Word contains a digit, search in index.csv file
+        with open(INDEX_FILE, 'r') as file:
+            reader = csv.reader(file)
+            next(reader)  # Skip the header row
+            for row in reader:
+                token = row[0]
+                if token == word:
+                    postings = [tuple(posting.split(':')) for posting in row[1].split(',')]
 
-                # Add the token and its postings to the cache
-                if len(cache) >= CACHE_SIZE_LIMIT:
-                    # Evict the least recently used item from the cache
-                    cache.pop(next(iter(cache)))
+                    if len(cache) >= CACHE_SIZE_LIMIT:
+                        cache.pop(next(iter(cache)))
 
-                cache[token] = postings
-                return token, postings
+                    cache[token] = postings
+                    return token, postings
+    else:
+        # Word starts with an alphabet, determine the file name based on the first letter
+        file_name = f"index/index_{word[0].lower()}.csv"
+        with open(file_name, 'r') as file:
+            reader = csv.reader(file)
+            next(reader)  # Skip the header row
+            for row in reader:
+                token = row[0]
+                if token == word:
+                    postings = [tuple(posting.split(':')) for posting in row[1].split(',')]
+
+                    if len(cache) >= CACHE_SIZE_LIMIT:
+                        cache.pop(next(iter(cache)))
+
+                    cache[token] = postings
+                    return token, postings
 
     return word, []
+
+
 
 
 def load_id_to_url():
@@ -128,13 +144,16 @@ def get_best_quartile(vector):
 def create_doc_tfidf_matrix(terms: list, inverted_index: dict) -> dict:
     vector = {}  # dictionary - documents are keys, tf-idf expressed as a list initially
     for i in range(len(terms)):
-        for document, tfidf_scores in inverted_index[terms[i]]:
-            if document in vector:
-                vector[document][i] = tfidf_scores
-            else:
-                vector[document] = [0 for _ in terms]
-                vector[document][i] = tfidf_scores
+        term = terms[i]
+        if term in inverted_index:
+            for document, tfidf_scores in inverted_index[term]:
+                if document in vector:
+                    vector[document][i] = tfidf_scores
+                else:
+                    vector[document] = [0 for _ in terms]
+                    vector[document][i] = tfidf_scores
     return vector
+
 
 
 def mod_query_vector(query: list) -> tuple:

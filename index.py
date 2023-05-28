@@ -13,7 +13,7 @@ import time
 
 STEMMER = stem.PorterStemmer()
 PATH = "DEV/"
-fullIndexPath = "index.csv"
+fullIndexPath = "index/index.csv"
 importantTags = ["h1", "h2", "h3", "strong", "b"]
 batch_size = 3000000
 # Increase the field size limit
@@ -54,13 +54,6 @@ class Index:
                 obj = json.loads(line)
                 yield obj
 
-    def write_to_csv(self):
-        """Writing the data to a CSV file."""
-        with open("idToUrl.csv", "w", newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(["id", "url"])
-            for doc_id, url in self.idToUrl.items():
-                writer.writerow([doc_id, url])
 
     def tfidf_score(self, postingsList: list):
         frequency_tfidf = list()
@@ -120,7 +113,7 @@ class Index:
             self.partial_index()
 
     def partial_index(self):
-        path = f"partial_index_{self.partial_file_index}.csv"
+        path = f"index/partial_index_{self.partial_file_index}.csv"
         with open(path, "w", newline="") as partialFile:
             writer = csv.writer(partialFile)
             sorted_index = sorted(self.inverted_index.items(), key=lambda x: x[0])
@@ -133,53 +126,65 @@ class Index:
 
 
     def merge_files(self):
-        """Opens the main index and all partial indices, sorts and writes all partial indices into the main index."""
-        with open(fullIndexPath, 'w', newline='') as final:
-            writer = csv.writer(final)
-            writer.writerow(["token", "postings"])
+        """Opens the main index and all partial indices, sorts and writes all partial indices into separate files based on the first letter of the token."""
+        file_readers = [csv.reader(open(filename)) for filename in self.partialIndexFiles]
+        to_be_removed = set()
+        file_writers = {}
+        index_file_writer = csv.writer(open("index/index.csv", 'w', newline=''))
+        index_file_writer.writerow(["token", "postings"])
 
-            file_readers = [csv.reader(open(filename)) for filename in self.partialIndexFiles]
-            next_rows = []
-            to_be_removed = set()
+        for i in range(26):
+            letter = chr(ord('a') + i)
+            filename = f"index/index_{letter}.csv"
+            file_writers[letter] = csv.writer(open(filename, 'w', newline=''))
+            file_writers[letter].writerow(["token", "postings"])
 
-            for i, reader in enumerate(file_readers):
+        next_rows = []
+
+        for i, reader in enumerate(file_readers):
+            try:
+                curr_row = next(reader)
+                next_rows.append((curr_row[0], curr_row[1:], reader))
+            except StopIteration:
+                to_be_removed.add(reader)
+
+        while file_readers:
+            next_rows.sort(key=lambda x: x[0])
+            get_next_vals = [next_rows[0][2]]
+            postings = next_rows[0][1]
+            i = 1
+            while i < len(next_rows):
+                if next_rows[i][0] == next_rows[i - 1][0]:
+                    postings.extend(next_rows[i][1])
+                    get_next_vals.append(next_rows[i][2])
+                else:
+                    break
+                i += 1
+
+            self.numberOfTokensProcessed += 1
+            token = next_rows[i - 1][0]
+            if token.isalpha():
+                first_letter = token[0].lower()
+                file_writers[first_letter].writerow([token] + postings)
+            else:
+                index_file_writer.writerow([token] + postings)
+
+            next_rows = next_rows[len(get_next_vals):]
+
+            for reader in get_next_vals:
                 try:
                     curr_row = next(reader)
                     next_rows.append((curr_row[0], curr_row[1:], reader))
                 except StopIteration:
                     to_be_removed.add(reader)
 
-            while file_readers:
-                next_rows.sort(key=lambda x: x[0])
-                get_next_vals = [next_rows[0][2]]
-                postings = next_rows[0][1]
-                i = 1
-                while i < len(next_rows):
-                    if next_rows[i][0] == next_rows[i - 1][0]:
-                        postings.extend(next_rows[i][1])
-                        get_next_vals.append(next_rows[i][2])
-                    else:
-                        break
-                    i += 1
-
-                self.numberOfTokensProcessed += 1
-                postings.sort(key=lambda x: int(x[0]))
-                writer.writerow([next_rows[i - 1][0]] + postings)
-
-                next_rows = next_rows[len(get_next_vals):]
-
-                for reader in get_next_vals:
-                    try:
-                        curr_row = next(reader)
-                        next_rows.append((curr_row[0], curr_row[1:], reader))
-                    except StopIteration:
-                        to_be_removed.add(reader)
-
-                file_readers = [reader for reader in file_readers if reader not in to_be_removed]
-                to_be_removed = set()
+            file_readers = [reader for reader in file_readers if reader not in to_be_removed]
+            to_be_removed = set()
 
         for file in self.partialIndexFiles:
             Path(file).unlink()
+
+
 
     def print_stats(self):
         totalSize = os.stat(fullIndexPath).st_size
@@ -193,7 +198,6 @@ if __name__ == "__main__":
     print(startTime)
     index = Index(PATH)
     index.build_index()
-    index.write_to_csv()
     index.write_id_to_url()
     index.merge_files()
     index.write_important_words()

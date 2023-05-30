@@ -163,7 +163,7 @@ class Index:
 
             self.numberOfTokensProcessed += 1
             token = next_rows[i - 1][0]
-            if token.isalpha():
+            if token[0].isalpha():
                 first_letter = token[0].lower()
                 file_writers[first_letter].writerow([token] + postings)
             else:
@@ -187,7 +187,7 @@ class Index:
 
 
     def print_stats(self):
-        totalSize = os.stat(fullIndexPath).st_size
+        totalSize = os.stat(index).st_size
         print("Number of files processed:", self.numberOfFilesProcessed)
         print("Number of unique tokens:", self.numberOfTokensProcessed)
         print("Total disk size (bytes):", totalSize)

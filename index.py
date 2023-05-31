@@ -10,6 +10,7 @@ from urllib.parse import urldefrag
 import sys
 from math import log10
 import time
+from simhash import Simhash
 
 STEMMER = stem.PorterStemmer()
 PATH = "DEV/"
@@ -32,6 +33,7 @@ class Index:
         self.partialIndexFiles = []
         self.partial_file_index = 0
         self.important_words = set()
+        self.fingerPrints = []
 
     def write_important_words(self):
         with open("important_words.txt", 'w') as file:
@@ -61,6 +63,15 @@ class Index:
             tfidf = round((1 + log10(post[1])) * (log10(self.numberOfFilesProcessed / len(postingsList))), 2)
             frequency_tfidf.append((post[0], tfidf))
         return frequency_tfidf
+    
+    def check_near_duplicaton(self, word_frequencies):
+        sh = Simhash(word_frequencies)
+        for fp in self.fingerPrints:
+            score = sh.distance(fp)
+            if score <= 0.9:
+                return True
+        self.fingerPrints.append(sh)
+        return False
 
     def build_index(self):
         path = Path(self.filepath)
@@ -94,6 +105,8 @@ class Index:
                             continue
                         tokens = [STEMMER.stem(word) for word in re.sub(r"[^a-zA-Z0-9\s]", "", line.text.lower()).split()]
                         frequency.update(tokens)
+
+                    if self.check_near_duplicaton(frequency): continue
 
                     for token, frequency in frequency.items():
                         if token not in self.inverted_index:
@@ -187,10 +200,14 @@ class Index:
 
 
     def print_stats(self):
-        totalSize = os.stat(index).st_size
+        total_size = 0
+        for path, dirs, files in os.walk("index/"):
+            for file in files:
+                file_path = os.path.join(path, file)
+                total_size += os.path.getsize(file_path)
         print("Number of files processed:", self.numberOfFilesProcessed)
         print("Number of unique tokens:", self.numberOfTokensProcessed)
-        print("Total disk size (bytes):", totalSize)
+        print("Total disk size (bytes):", total_size)
 
 
 if __name__ == "__main__":

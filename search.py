@@ -107,7 +107,7 @@ def process_query(query, important_words="important_words.txt"):
             rankings[doc] = score
     best = sorted(rankings, key=lambda x: -rankings[x])
     top_urls = [id_to_url[int(doc)] for doc in best]
-    return top_urls[:min(len(top_urls), 5)]
+    return top_urls
 
 
 
@@ -178,6 +178,7 @@ def perform_search():
         else:
             for i in range(min(5, len(similar_doc_list))):
                 result_text.insert(tk.END, f"{similar_doc_list[i]}\n\n")
+            result_text.insert(tk.END, f"Total number of urls: {len(similar_doc_list)}\n\n")
         t2 = time.time()
         time_label.config(text=f"{t2 - t1:.2f} seconds")
     else:

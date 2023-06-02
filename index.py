@@ -79,11 +79,11 @@ class Index:
         sh = Simhash(word_frequencies)
         for fp in self.fingerPrints:
             score = sh.distance(fp)
-            if score <= 0.9:
+            if score <= 0.99:
                 return True
         self.fingerPrints.append(sh)
         return False
-
+    
     def build_index(self):
         path = Path(self.filepath)
         for directory in path.iterdir():
@@ -94,18 +94,20 @@ class Index:
                     continue
 
                 # Read each JSON object from the file
-                for line in self.generate_line(file):
-                    doc_id = self.document_number
+                for obj in self.generate_line(file):
+                    url = urldefrag(obj["url"]).url
 
                     # Store the URL in the idToUrl mapping
-                    url = line["url"]
-                    self.idToUrl[doc_id] = url
+                    if url in self.urlToId:
+                        continue
+                    doc_id = self.document_number
                     self.urlToId[url] = doc_id
+                    self.idToUrl[doc_id] = url
 
                     # Pre-process and extract text from HTML
-                    html = line["content"]
-                    soup = BeautifulSoup(html, "html.parser")
-                    
+                    raw_content = obj["content"]
+                    soup = BeautifulSoup(raw_content, features="html.parser")
+
                     # Extract important words from specified HTML tags
                     for tags in soup.find_all(importantTags):
                         for words in re.sub(r"[^a-zA-Z0-9\s]", "", tags.text.lower()).split():
@@ -121,8 +123,7 @@ class Index:
                         frequency.update(tokens)
 
                     # Check for near duplication
-                    if self.check_near_duplicaton(frequency):
-                        continue
+                    if self.check_near_duplicaton(frequency): continue
 
                     # Update the inverted index with token frequencies
                     for token, frequency in frequency.items():
@@ -133,24 +134,17 @@ class Index:
                             self.inverted_index[token].append((doc_id, frequency * 100))
                         else:
                             self.inverted_index[token].append((doc_id, frequency))
-                            
-                    self.numberOfFilesProcessed += 1
-                    self.document_number += 1
+                self.numberOfFilesProcessed += 1
+                self.document_number += 1
 
-                    # Create partial index files if the inverted index size exceeds the batch size
-                    if sys.getsizeof(self.inverted_index) >= batch_size:
-                        self.partial_index()
+                # Create partial index files if the inverted index size exceeds the batch size
+                if sys.getsizeof(self.inverted_index) >= batch_size:
+                    self.partial_index()
 
-        # Create the final partial index if there are remaining tokens
         if self.inverted_index:
             self.partial_index()
 
-        # Merge all partial index files into a single full index file
-        self.merge_files()
 
-        # Write the important words and idToUrl mapping to separate files
-        self.write_important_words()
-        self.write_id_to_url()
 
     def partial_index(self):
         """Write the inverted index to a partial index file"""
@@ -219,6 +213,7 @@ class Index:
             while i < len(next_rows):
                 if next_rows[i][0].lower() == next_rows[i - 1][0].lower():  # Compare tokens case-insensitively
                     postings.extend(next_rows[i][1])
+                    get_next_vals.append(next_rows[i][2])
                 else:
                     break
                 i += 1
@@ -235,7 +230,7 @@ class Index:
                 postings_str = ", ".join(postings)  # Combine postings into a single string
                 index_file_writer.writerow([token, postings_str])
 
-            next_rows = next_rows[i:]
+            next_rows = next_rows[len(get_next_vals):]
 
             # Read the next row from the file readers
             for reader in get_next_vals:

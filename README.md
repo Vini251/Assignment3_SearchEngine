@@ -74,6 +74,8 @@ mechanisms to help refine the search results.
 
 # **How to run the search engine:**
 - Download a zip file of this repository 
-- To create inverted index, run this code on the termianl under the directory this repository is stored: python3 index.py
-- To start the search engine, run this code on the termianl under the directory this repository is stored: python3 search.py
+- To create inverted index, run this code on the termianl under the directory this repository is stored: 
+**python3 index.py**
+- To start the search engine, run this code on the termianl under the directory this repository is stored: 
+**python3 search.py**
 

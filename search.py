@@ -102,6 +102,8 @@ def process_query(query, important_words="important_words.txt"):
 
     # Retrieve relevant indexes for the query tokens
     relevant_indexes = {key: value for key, value in [retrieve_index(word) for word in query_tokens] if value}
+    #print(relevant_indexes)
+    #total_urls = len(relevant_indexes[query])
 
     if not relevant_indexes:
         return []  # Return empty list if no relevant indexes found
@@ -112,16 +114,20 @@ def process_query(query, important_words="important_words.txt"):
 
     # Create the TF-IDF matrix for the query tokens and relevant indexes
     vectors = create_doc_tfidf_matrix(query_tokens, relevant_indexes)
+    #print(len(vectors))
 
     # Filter the vectors based on the best quartile and calculate the average maximum
     vectors, avg_max = get_best_quartile(vectors)
+    #print(len(vectors))
 
     # Normalize the query vector and create a dictionary of normalized document vectors
     query_vector = normalize(query_vector)
     normed = {document: normalize(vectors[document]) for document in vectors}
+    #print(normed)
 
     # Calculate the cosine ranking for the query vector and normalized document vectors
     cosine_rank = cosine_ranking(query_vector, normed)
+    #print(cosine_rank)
 
     rankings = {}
 
@@ -140,9 +146,11 @@ def process_query(query, important_words="important_words.txt"):
     # Sort the rankings and retrieve the corresponding top URLs
     best = sorted(rankings, key=lambda x: -rankings[x])
     top_urls = [id_to_url[int(doc)] for doc in best]
+    #print(top_urls)
 
     # Return the list of top URLs
     return top_urls
+
 
 
 
@@ -245,13 +253,13 @@ def perform_search():
         if len(similar_doc_list) == 0:
             result_text.insert(tk.END, "No result found")  # Display a message when no similar documents are found
         else:
-            for i in range(min(5, len(similar_doc_list))):  # Iterate over a maximum of 5 similar documents
+            for i in range(min(10, len(similar_doc_list))):  # Iterate over a maximum of 5 similar documents
                 result_text.insert(tk.END, f"{similar_doc_list[i]}\n\n")  # Display each similar document URL
 
             result_text.insert(tk.END, f"Total number of urls: {len(similar_doc_list)}\n\n")  # Display the total number of URLs found
 
         t2 = time.time()  # Measure the end time for performance measurement
-        time_label.config(text=f"{t2 - t1:.2f} seconds")  # Update the time_label widget with the search time
+        time_label.config(text=f"{t2 - t1:.4f} seconds")  # Update the time_label widget with the search time
 
     else:
         result_text.delete(1.0, tk.END)  # Clear the existing contents in the result_text widget if no query is provided

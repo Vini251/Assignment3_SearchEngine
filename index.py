@@ -161,15 +161,14 @@ class Index:
             except StopIteration:
                 to_be_removed.add(reader)
 
-        while file_readers:
-            next_rows.sort(key=lambda x: x[0])
+        while next_rows:
+            next_rows.sort(key=lambda x: x[0].lower())  # Sort the rows case-insensitively
             get_next_vals = [next_rows[0][2]]
             postings = next_rows[0][1]
             i = 1
             while i < len(next_rows):
-                if next_rows[i][0] == next_rows[i - 1][0]:
+                if next_rows[i][0].lower() == next_rows[i - 1][0].lower():  # Compare tokens case-insensitively
                     postings.extend(next_rows[i][1])
-                    get_next_vals.append(next_rows[i][2])
                 else:
                     break
                 i += 1
@@ -178,11 +177,13 @@ class Index:
             token = next_rows[i - 1][0]
             if token[0].isalpha():
                 first_letter = token[0].lower()
-                file_writers[first_letter].writerow([token] + postings)
+                postings_str = ", ".join(postings)  # Combine postings into a single string
+                file_writers[first_letter].writerow([token, postings_str])
             else:
-                index_file_writer.writerow([token] + postings)
+                postings_str = ", ".join(postings)  # Combine postings into a single string
+                index_file_writer.writerow([token, postings_str])
 
-            next_rows = next_rows[len(get_next_vals):]
+            next_rows = next_rows[i:]
 
             for reader in get_next_vals:
                 try:
@@ -196,6 +197,7 @@ class Index:
 
         for file in self.partialIndexFiles:
             Path(file).unlink()
+
 
 
 

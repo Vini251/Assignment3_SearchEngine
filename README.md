@@ -74,6 +74,11 @@ mechanisms to help refine the search results.
 
 # **How to run the search engine:**
 - Download a zip file of this repository 
+- If the libraries are not already downloaded, you might need to download them using these commands:
+	- pip3 install nltk (for nltk module)
+	- pip3 install simhash (for simhash module)
+	- pip3 install urllib (for urllib module)
+	- pip3 install bs4 (for beautiful soup module)
 - To create inverted index, run this code on the termianl under the directory this repository is stored: 
 **python3 index.py**
 - To start the search engine, run this code on the termianl under the directory this repository is stored: 

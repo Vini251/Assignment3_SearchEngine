@@ -79,7 +79,7 @@ class Index:
         sh = Simhash(word_frequencies)
         for fp in self.fingerPrints:
             score = sh.distance(fp)
-            if score <= 0.99:
+            if score <= 0.9:
                 return True
         self.fingerPrints.append(sh)
         return False

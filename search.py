@@ -256,7 +256,6 @@ def perform_search():
             for i in range(min(10, len(similar_doc_list))):  # Iterate over a maximum of 5 similar documents
                 result_text.insert(tk.END, f"{similar_doc_list[i]}\n\n")  # Display each similar document URL
 
-            result_text.insert(tk.END, f"Total number of urls: {len(similar_doc_list)}\n\n")  # Display the total number of URLs found
 
         t2 = time.time()  # Measure the end time for performance measurement
         time_label.config(text=f"{t2 - t1:.4f} seconds")  # Update the time_label widget with the search time

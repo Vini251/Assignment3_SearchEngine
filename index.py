@@ -12,41 +12,30 @@ from math import log10
 import time
 from simhash import Simhash
 
-# Set up Porter Stemmer for word stemming
 STEMMER = stem.PorterStemmer()
-
-# Define the path to the documents
 PATH = "DEV/"
-
-# Define the path to the full index
 fullIndexPath = "index/index.csv"
-
-# Define important HTML tags
 importantTags = ["h1", "h2", "h3", "strong", "b"]
-
-# Set the batch size for partial index creation
 batch_size = 3000000
-
-# Increase the field size limit for CSV parsing
+# Increase the field size limit
 csv.field_size_limit(1024 * 1024 * 1024) 
 
 
 class Index:
     def __init__(self, path) -> None:
         self.filepath = path
-        self.idToUrl = {}  # Mapping of document ID to URL
-        self.urlToId = {}  # Mapping of URL to document ID
-        self.inverted_index = {}  # Inverted index for storing tokens and postings
-        self.numberOfFilesProcessed = 0  # Number of files processed
-        self.document_number = 0  # Number of documents
-        self.numberOfTokensProcessed = 0  # Number of tokens processed
-        self.partialIndexFiles = []  # List of paths to partial index files
-        self.partial_file_index = 0  # Index for naming partial index files
-        self.important_words = set()  # Set of important words
-        self.fingerPrints = []  # List of Simhash fingerprints for near duplication detection
+        self.idToUrl = {}
+        self.urlToId = {}
+        self.inverted_index = {}
+        self.numberOfFilesProcessed = 0
+        self.document_number = 0
+        self.numberOfTokensProcessed = 0
+        self.partialIndexFiles = []
+        self.partial_file_index = 0
+        self.important_words = set()
+        self.fingerPrints = []
 
     def write_important_words(self):
-        # Write the important words to a file
         with open("important_words.txt", 'w') as file:
             for word in self.important_words:
                 file.write(word + '\n')
@@ -59,6 +48,7 @@ class Index:
             for doc_id, url in self.idToUrl.items():
                 writer.writerow([doc_id, url])
 
+
     def generate_line(self, filename):
         """This function reads the file and yields each JSON object."""
         with open(filename) as f:
@@ -66,16 +56,28 @@ class Index:
                 obj = json.loads(line)
                 yield obj
 
+
     def tfidf_score(self, postingsList: list):
         """Compute the TF-IDF score for postings"""
-        frequency_tfidf = list()
-        for post in postingsList:
-            tfidf = round((1 + log10(post[1])) * (log10(self.numberOfFilesProcessed / len(postingsList))), 2)
-            frequency_tfidf.append((post[0], tfidf))
-        return frequency_tfidf
+        freqToTfidf = []
+        totalPostings = len(postingsList)
+
+        for posting in postingsList:
+            document_tfidf = posting.split(',')
+            for dt in document_tfidf:
+                document, frequency = dt.split(':')
+
+                tf = 1 + log10(int(frequency))
+                idf = log10(self.numberOfFilesProcessed / totalPostings)
+                tfidf = round(tf * idf, 2)
+                freqToTfidf.append((document, tfidf))
+
+        return freqToTfidf
+
+
+
     
     def check_near_duplicaton(self, word_frequencies):
-        """Check for near duplication using Simhash"""
         sh = Simhash(word_frequencies)
         for fp in self.fingerPrints:
             score = sh.distance(fp)
@@ -83,7 +85,7 @@ class Index:
                 return True
         self.fingerPrints.append(sh)
         return False
-    
+
     def build_index(self):
         path = Path(self.filepath)
         for directory in path.iterdir():
@@ -93,27 +95,22 @@ class Index:
                 if not file.is_file():
                     continue
 
-                # Read each JSON object from the file
                 for obj in self.generate_line(file):
                     url = urldefrag(obj["url"]).url
 
-                    # Store the URL in the idToUrl mapping
                     if url in self.urlToId:
                         continue
                     doc_id = self.document_number
                     self.urlToId[url] = doc_id
                     self.idToUrl[doc_id] = url
 
-                    # Pre-process and extract text from HTML
                     raw_content = obj["content"]
                     soup = BeautifulSoup(raw_content, features="html.parser")
 
-                    # Extract important words from specified HTML tags
                     for tags in soup.find_all(importantTags):
                         for words in re.sub(r"[^a-zA-Z0-9\s]", "", tags.text.lower()).split():
                             self.important_words.add(STEMMER.stem(words))
 
-                    # Process and tokenize the text
                     soup = soup.find_all()
                     frequency = Counter()
                     for line in soup:
@@ -122,10 +119,8 @@ class Index:
                         tokens = [STEMMER.stem(word) for word in re.sub(r"[^a-zA-Z0-9\s]", "", line.text.lower()).split()]
                         frequency.update(tokens)
 
-                    # Check for near duplication
-                    if self.check_near_duplicaton(frequency): continue
+                    #if self.check_near_duplicaton(frequency) == False: continue
 
-                    # Update the inverted index with token frequencies
                     for token, frequency in frequency.items():
                         if token not in self.inverted_index:
                             self.inverted_index[token] = []
@@ -137,39 +132,23 @@ class Index:
                 self.numberOfFilesProcessed += 1
                 self.document_number += 1
 
-                # Create partial index files if the inverted index size exceeds the batch size
                 if sys.getsizeof(self.inverted_index) >= batch_size:
                     self.partial_index()
 
         if self.inverted_index:
             self.partial_index()
 
-
-
     def partial_index(self):
-        """Write the inverted index to a partial index file"""
         path = f"index/partial_index_{self.partial_file_index}.csv"
         with open(path, "w", newline="") as partialFile:
             writer = csv.writer(partialFile)
-            
-            # Sort the inverted index by token
             sorted_index = sorted(self.inverted_index.items(), key=lambda x: x[0])
-            
-            # Clear the inverted index
             self.inverted_index = {}
-            
-            # Iterate over the sorted index
             for key, value in sorted_index:
-                # Convert the postings list to a string representation
                 postings = ', '.join(f"{doc_id}:{frequency}" for doc_id, frequency in value)
-                
-                # Write the token and postings to the file
                 writer.writerow([key, postings])
-        
-        # Increment the partial file index and add the path to the list of partial index files
         self.partial_file_index += 1
         self.partialIndexFiles.append(path)
-
 
 
     def merge_files(self):
@@ -220,17 +199,32 @@ class Index:
 
             self.numberOfTokensProcessed += 1
             token = next_rows[i - 1][0]
-            
+
+            postings.sort(key=lambda x: x[0])
+            # Calculate TF-IDF scores for the postings
+            postings_tfidf = self.tfidf_score(postings)
+
+            # Create a list to store the formatted postings
+            formatted_postings = []
+
+            # Format the postings as "doc: tfidf" and append them to the list
+            for posting in postings_tfidf:
+                formatted_posting = f"{posting[0]}:{posting[1]}"
+                formatted_postings.append(formatted_posting)
+
+            # Combine the formatted postings into a single string
+            postings_str = ", ".join(formatted_postings)
+
             # Write the token and postings to the appropriate file based on the first letter of the token
             if token[0].isalpha():
                 first_letter = token[0].lower()
-                postings_str = ", ".join(postings)  # Combine postings into a single string
                 file_writers[first_letter].writerow([token, postings_str])
             else:
-                postings_str = ", ".join(postings)  # Combine postings into a single string
                 index_file_writer.writerow([token, postings_str])
 
             next_rows = next_rows[len(get_next_vals):]
+
+
 
             # Read the next row from the file readers
             for reader in get_next_vals:

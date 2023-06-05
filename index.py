@@ -119,7 +119,7 @@ class Index:
                         tokens = [STEMMER.stem(word) for word in re.sub(r"[^a-zA-Z0-9\s]", "", line.text.lower()).split()]
                         frequency.update(tokens)
 
-                    #if self.check_near_duplicaton(frequency) == False: continue
+                    if self.check_near_duplicaton(frequency) == False: continue
 
                     for token, frequency in frequency.items():
                         if token not in self.inverted_index:
